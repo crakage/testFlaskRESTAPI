@@ -2,6 +2,12 @@ from flask import Flask, jsonify, request, Response
 import json
 from settings import *
 from BookModel import *
+import jwt, datetime
+from UserModel import User
+from functools import wraps
+
+
+app.config['SECRET_KEY'] = 'meow'
 
 
 def valid_book_object(book_object):
@@ -17,8 +23,33 @@ def valid_put_request_data(book_object):
     else:
         return False
 
+def token_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        token = request.args.get('token')
+        try:
+            jwt.decode(token, app.config['SECRET_KEY'])
+            return f(*args, **kwargs)
+        except:
+            return jsonify({'error': 'Need a valid token to view this page'}), 401
+    return wrapper
+
+
+@app.route('/login', methods=['POST'])
+def get_token():
+    request_data = request.get_json()
+    username = str(request_data['username'])
+    password = str(request_data['password'])
+    match = User.username_password_match(username, password)
+    if match:
+        expiration_date = datetime.datetime.utcnow() + datetime.timedelta(seconds=600)
+        token = jwt.encode({'exp': expiration_date}, app.config['SECRET_KEY'], 'HS256')
+        return token
+    else:
+        return Response('', 401, mimetype='application/json')
 
 # GET Method by default or add argument methods=POST
+# GET /books?token=qwerty1345678
 @app.route('/books')
 def get_books():
     return jsonify({"books": Book.get_all_books()})
@@ -38,6 +69,7 @@ def get_book_by_isbn(isbn):
 #     "isbn": 123456
 # }
 @app.route('/books', methods=['POST'])
+@token_required
 def add_book():
     request_data = request.get_json()
     if valid_book_object(request_data):
@@ -61,6 +93,7 @@ def add_book():
 #     "price": 0.99,
 # }
 @app.route("/books/<int:isbn>", methods=["PUT"])
+@token_required
 def replace_book(isbn):
     request_data = request.get_json()
     if not valid_put_request_data(request_data):
@@ -81,6 +114,7 @@ def replace_book(isbn):
 #     "Key": "New value"
 # }
 @app.route("/books/<int:isbn>", methods=["PATCH"])
+@token_required
 def update_book(isbn):
     request_data = request.get_json()
 
@@ -95,6 +129,7 @@ def update_book(isbn):
 
 # DELETE /books/123453546
 @app.route("/books/<int:isbn>", methods=["DELETE"])
+@token_required
 def delete_book(isbn):
     if Book.delete_book(isbn):
         response = Response("", status=204)

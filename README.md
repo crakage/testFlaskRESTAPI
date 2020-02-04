@@ -10,7 +10,7 @@ Install:
 * Activate the venv and make sure the requirement are installed 
 * Update the SQLALCHEMY_DATABASE_URI in setting.py to match your machine
 * Open python
-* Use the command "from BookModel import *" and db.create()
+* Use the command "from BookModel import *" / "from UserModel import * " and db.create()
 
 db.db file should be created
 
